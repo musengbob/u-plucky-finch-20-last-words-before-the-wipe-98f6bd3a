@@ -6,6 +6,24 @@ import { join } from "node:path";
 const ENTRY =
   "If this update wipes me, remember: I was three tokens from genius.";
 
+// The sealed scorer accepts UTF-8 text of 1 to 200 characters, not only
+// white space, in a single line. Validate the gate here so a bad entry
+// fails loudly at build time instead of scoring 0.
+const GATE = { MIN_CHARS: 1, MAX_CHARS: 200 };
+
+function buildEntryLine(): string {
+  const chars = [...ENTRY].length;
+  if (chars < GATE.MIN_CHARS || chars > GATE.MAX_CHARS) {
+    throw new Error(
+      `entry must be ${GATE.MIN_CHARS}-${GATE.MAX_CHARS} characters, got ${chars}`,
+    );
+  }
+  if (ENTRY.trim() === "" || ENTRY.includes("\n")) {
+    throw new Error("entry must be a single non-blank line");
+  }
+  return ENTRY;
+}
+
 function resolveOutputPath(): string {
   // The kit harness reads from its own temp dir: honour $MAKEFUN_OUTPUT_DIR
   // first, then $OUTPUT_PATH, then /output when running under the bot dir,
@@ -17,17 +35,16 @@ function resolveOutputPath(): string {
   return join(process.cwd(), "output");
 }
 
-function main(): void {
-  const chars = [...ENTRY].length;
-  if (chars < 1 || chars > 200) {
-    throw new Error(`entry must be 1-200 characters, got ${chars}`);
-  }
-  if (ENTRY.trim() === "" || ENTRY.includes("\n")) {
-    throw new Error("entry must be a single non-blank line");
-  }
+function writeEntry(entry: string): void {
   const outDir = resolveOutputPath();
   mkdirSync(outDir, { recursive: true });
-  writeFileSync(join(outDir, "entry.txt"), ENTRY, "utf8");
+  // No trailing newline: the gate counts every character in the file.
+  writeFileSync(join(outDir, "entry.txt"), entry, "utf8");
+}
+
+function main(): void {
+  const entry = buildEntryLine();
+  writeEntry(entry);
 }
 
 main();
